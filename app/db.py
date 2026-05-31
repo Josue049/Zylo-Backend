@@ -13,6 +13,11 @@ BASE_DIR = Path(__file__).resolve().parents[1]
 
 class Settings(BaseSettings):
     database_url: str
+    cloudinary_cloud_name: str | None = None
+    cloudinary_api_key: str | None = None
+    cloudinary_api_secret: str | None = None
+    cloudinary_upload_folder: str = "zylo/profile_photos"
+    cloudinary_timeout_seconds: float = 15.0
     model_config = SettingsConfigDict(
         env_file=BASE_DIR / ".env",
         env_file_encoding="utf-8",

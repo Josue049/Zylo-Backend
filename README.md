@@ -17,7 +17,13 @@ Ejemplo:
 
 ```env
 DATABASE_URL=postgresql+psycopg://<usuario>:<contraseña>@<host>:<puerto>/<base_de_datos>
+CLOUDINARY_CLOUD_NAME=<tu_cloud_name>
+CLOUDINARY_API_KEY=<tu_api_key>
+CLOUDINARY_API_SECRET=<tu_api_secret>
+CLOUDINARY_UPLOAD_FOLDER=zylo/profile_photos
 ```
+
+Si usas el endpoint de foto de perfil (`POST /users/me/photo`), la imagen se sube a Cloudinary por API y se guarda `secure_url` en `users.photo_url`.
 
 ## Credenciales demo
 

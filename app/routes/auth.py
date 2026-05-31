@@ -2,12 +2,12 @@ from __future__ import annotations
 
 from datetime import timedelta, timezone, datetime
 
-from fastapi import APIRouter, Depends, Header, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import get_current_user
+from ..deps import _extract_session_token, get_current_user
 from ..models import Business, PasswordResetToken, SessionToken, User
 from ..schemas import ForgotPasswordRequest, GenericMessageOut, LoginRequest, RegisterRequest, ResetPasswordRequest
 from ..security import create_reset_token, create_session_token, hash_password, verify_password
@@ -83,10 +83,10 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
 
 
 @router.post("/logout", response_model=GenericMessageOut)
-def logout(current_user=Depends(get_current_user), authorization: str | None = Header(default=None), db: Session = Depends(get_db)):
+def logout(request: Request, current_user=Depends(get_current_user), db: Session = Depends(get_db)):
     del current_user
-    if authorization and authorization.lower().startswith("bearer "):
-        token = authorization.split(" ", 1)[1].strip()
+    token = _extract_session_token(request.headers)
+    if token:
         session = db.get(SessionToken, token)
         if session:
             db.delete(session)

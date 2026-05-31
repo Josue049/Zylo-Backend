@@ -62,6 +62,7 @@ def service_payload(service: Service) -> dict:
         "price": service.price,
         "active": service.active,
         "weekly_hours": service.weekly_hours or {},
+        "professionals": service.professionals or [],
         "created_at": service.created_at,
         "updated_at": service.updated_at,
     }
@@ -76,6 +77,7 @@ def booking_payload(booking: Booking, db: Session) -> dict:
         "user_id": booking.user_id,
         "business_id": booking.business_id,
         "service_id": booking.service_id,
+        "professional_id": booking.professional_id,
         "start_at": booking.start_at,
         "end_at": booking.end_at,
         "notes": booking.notes,

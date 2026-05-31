@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import inspect, text
 
 if __package__ in {None, ""}:
     project_root = Path(__file__).resolve().parent.parent
@@ -53,9 +54,33 @@ app.include_router(conversations_router)
 app.include_router(notifications_router)
 
 
+def ensure_service_schema() -> None:
+    inspector = inspect(engine)
+    table_names = set(inspector.get_table_names())
+    statements: list[str] = []
+
+    if "services" in table_names:
+        service_columns = {column["name"] for column in inspector.get_columns("services")}
+        if "weekly_hours" not in service_columns:
+            statements.append("ALTER TABLE services ADD COLUMN weekly_hours JSON")
+        if "professionals" not in service_columns:
+            statements.append("ALTER TABLE services ADD COLUMN professionals JSON")
+
+    if "bookings" in table_names:
+        booking_columns = {column["name"] for column in inspector.get_columns("bookings")}
+        if "professional_id" not in booking_columns:
+            statements.append("ALTER TABLE bookings ADD COLUMN professional_id VARCHAR(32)")
+
+    if statements:
+        with engine.begin() as connection:
+            for statement in statements:
+                connection.execute(text(statement))
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_service_schema()
     with SessionLocal() as db:
         seed_demo_data(db)
 

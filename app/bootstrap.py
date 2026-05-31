@@ -93,6 +93,10 @@ def seed_demo_data(db: Session) -> None:
                     "saturday": ["10:00", "14:00"],
                     "sunday": [],
                 },
+                professionals=[
+                    {"id": "ana", "name": "Ana", "role": "Estilista"},
+                    {"id": "luis", "name": "Luis", "role": "Barbero"},
+                ],
             ),
             Service(
                 id=make_id("srv"),
@@ -111,6 +115,9 @@ def seed_demo_data(db: Session) -> None:
                     "saturday": ["10:00", "15:00"],
                     "sunday": [],
                 },
+                professionals=[
+                    {"id": "luis", "name": "Luis", "role": "Barbero"},
+                ],
             ),
             Favorite(user_id=client.id, business_id=business.id),
             SessionToken(token="demo-internal-token", user_id=client.id, last_seen_at=utcnow()),

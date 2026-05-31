@@ -26,6 +26,12 @@ def create_booking(payload: BookingCreateRequest, current_user: User = Depends(g
     service = db.get(Service, payload.service_id)
     if not service or service.business_id != payload.business_id:
         raise HTTPException(status_code=404, detail="Service not found")
+    professionals = service.professionals or []
+    if not professionals:
+        raise HTTPException(status_code=400, detail="Service has no professionals configured")
+    available_professionals = {item.get("id") for item in professionals if item.get("id")}
+    if payload.professional_id not in available_professionals:
+        raise HTTPException(status_code=400, detail="Invalid professional for this service")
 
     available, end_at = check_business_availability_for_booking(payload.business_id, payload.start_at, service.duration_minutes, db)
     if not available:
@@ -38,6 +44,7 @@ def create_booking(payload: BookingCreateRequest, current_user: User = Depends(g
         user_id=current_user.id,
         business_id=payload.business_id,
         service_id=payload.service_id,
+        professional_id=payload.professional_id,
         start_at=payload.start_at,
         end_at=end_at,
         notes=payload.notes,

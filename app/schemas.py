@@ -42,6 +42,16 @@ class UpdateUserRequest(BaseModel):
     bio: Optional[str] = None
 
 
+class TeamMemberRequest(BaseModel):
+    id: str
+    name: str
+    role: str
+
+
+class TeamUpdateRequest(BaseModel):
+    items: list[TeamMemberRequest]
+
+
 class ServiceCreateRequest(BaseModel):
     name: str
     description: Optional[str] = None
@@ -49,6 +59,7 @@ class ServiceCreateRequest(BaseModel):
     price: float = Field(ge=0)
     active: bool = True
     weekly_hours: dict[str, list[str]] | None = None
+    professionals: list[dict[str, str]] | None = None
 
 
 class ServiceUpdateRequest(BaseModel):
@@ -58,11 +69,13 @@ class ServiceUpdateRequest(BaseModel):
     price: Optional[float] = Field(default=None, ge=0)
     active: Optional[bool] = None
     weekly_hours: dict[str, list[str]] | None = None
+    professionals: list[dict[str, str]] | None = None
 
 
 class BookingCreateRequest(BaseModel):
     business_id: str
     service_id: str
+    professional_id: str
     start_at: datetime
     notes: Optional[str] = None
 
@@ -93,6 +106,13 @@ class ConversationCreateRequest(BaseModel):
 
 class MessageCreateRequest(BaseModel):
     content: str
+
+
+class NotificationCreateRequest(BaseModel):
+    recipient_user_id: str
+    type: str
+    title: str
+    message: str
 
 
 class GenericMessageOut(BaseModel):

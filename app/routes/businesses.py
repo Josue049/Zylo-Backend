@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from ..db import get_db
 from ..deps import get_current_business, get_current_user
 from ..models import AvailabilityBlock, Booking, Business, Review, Service, User
-from ..schemas import AvailabilityBlockCreateRequest, BusinessReviewRequest, ServiceCreateRequest
+from ..schemas import AvailabilityBlockCreateRequest, BusinessReviewRequest, ServiceCreateRequest, TeamUpdateRequest
 from ..serializers import business_payload, service_payload
 from ..utils import make_id
 
@@ -74,6 +74,10 @@ def business_is_available(db: Session, business_id: str, start_at: datetime, end
 
 def business_owned_by_current_user(current_business: Business) -> Business:
     return current_business
+
+
+def business_team_member_ids(business: Business) -> set[str]:
+    return {member.get("id") for member in (business.team or []) if isinstance(member, dict) and member.get("id")}
 
 
 WEEKDAY_KEYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
@@ -156,6 +160,13 @@ def list_my_services(current_business: Business = Depends(get_current_business),
 
 @router.post("/me/services")
 def create_my_service(payload: ServiceCreateRequest, current_business: Business = Depends(get_current_business), db: Session = Depends(get_db)):
+    professionals = payload.professionals or []
+    if not professionals:
+        raise HTTPException(status_code=400, detail="At least one professional is required")
+    team_member_ids = business_team_member_ids(current_business)
+    for professional in professionals:
+        if professional.get("id") not in team_member_ids:
+            raise HTTPException(status_code=400, detail="Each professional must exist in the business team")
     service = Service(
         id=make_id("srv"),
         business_id=current_business.id,
@@ -165,11 +176,20 @@ def create_my_service(payload: ServiceCreateRequest, current_business: Business 
         price=payload.price,
         active=payload.active,
         weekly_hours=payload.weekly_hours or {},
+        professionals=professionals,
     )
     db.add(service)
     db.commit()
     db.refresh(service)
     return {"service": service_payload(service)}
+
+
+@router.patch("/me/team")
+def update_my_team(payload: TeamUpdateRequest, current_business: Business = Depends(get_current_business), db: Session = Depends(get_db)):
+    current_business.team = [member.model_dump() for member in payload.items]
+    db.commit()
+    db.refresh(current_business)
+    return {"team": current_business.team or []}
 
 
 @router.get("/me/bookings")
@@ -227,12 +247,20 @@ def weekly_agenda(current_business: Business = Depends(get_current_business), db
 @router.get("/me/stats")
 def business_stats(current_business: Business = Depends(get_current_business), db: Session = Depends(get_db)):
     bookings = list(db.scalars(select(Booking).where(Booking.business_id == current_business.id)))
+    reviews = list(db.scalars(select(Review).where(Review.business_id == current_business.id)))
     by_service = defaultdict(int)
     by_status = defaultdict(int)
     for booking in bookings:
         by_service[booking.service_id] += 1
         by_status[booking.status] += 1
-    return {"by_service": dict(by_service), "by_status": dict(by_status), "total": len(bookings)}
+    average_rating = round(sum(review.rating for review in reviews) / len(reviews), 2) if reviews else 0.0
+    return {
+        "by_service": dict(by_service),
+        "by_status": dict(by_status),
+        "total": len(bookings),
+        "reviews_count": len(reviews),
+        "average_rating": average_rating,
+    }
 
 
 @router.get("/{business_id}/services")

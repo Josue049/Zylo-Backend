@@ -1,15 +1,23 @@
 from __future__ import annotations
 
 from collections.abc import Generator
+from pathlib import Path
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
 
+BASE_DIR = Path(__file__).resolve().parents[1]
+
+
 class Settings(BaseSettings):
-    database_url: str = "sqlite:///./zylo.db"
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    database_url: str
+    model_config = SettingsConfigDict(
+        env_file=BASE_DIR / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 
 settings = Settings()

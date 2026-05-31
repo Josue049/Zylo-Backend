@@ -11,12 +11,12 @@ uvicorn app.main:app --reload
 
 ## Base de datos
 
-Por defecto la app usa SQLite local para desarrollo, pero puedes conectarla a PostgreSQL definiendo `DATABASE_URL` en `.env` o en el entorno.
+La app lee la conexión desde `.env` o el entorno. Copia `.env.example` a `.env` y coloca ahí tus credenciales reales.
 
 Ejemplo:
 
 ```env
-DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/zylo
+DATABASE_URL=postgresql+psycopg://<usuario>:<contraseña>@<host>:<puerto>/<base_de_datos>
 ```
 
 ## Credenciales demo

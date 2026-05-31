@@ -48,6 +48,7 @@ class ServiceCreateRequest(BaseModel):
     duration_minutes: int = Field(gt=0)
     price: float = Field(ge=0)
     active: bool = True
+    weekly_hours: dict[str, list[str]] | None = None
 
 
 class ServiceUpdateRequest(BaseModel):
@@ -56,6 +57,7 @@ class ServiceUpdateRequest(BaseModel):
     duration_minutes: Optional[int] = Field(default=None, gt=0)
     price: Optional[float] = Field(default=None, ge=0)
     active: Optional[bool] = None
+    weekly_hours: dict[str, list[str]] | None = None
 
 
 class BookingCreateRequest(BaseModel):
@@ -71,6 +73,11 @@ class BookingRescheduleRequest(BaseModel):
 
 class BookingStatusRequest(BaseModel):
     status: Literal["accepted", "rejected"]
+
+
+class BusinessReviewRequest(BaseModel):
+    rating: float = Field(ge=1, le=5)
+    comment: Optional[str] = None
 
 
 class AvailabilityBlockCreateRequest(BaseModel):

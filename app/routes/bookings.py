@@ -9,7 +9,7 @@ from ..models import Booking, Business, Notification, Service, User
 from ..schemas import BookingCreateRequest, BookingRescheduleRequest, BookingStatusRequest
 from ..serializers import booking_payload
 from ..utils import make_id
-from .businesses import check_business_availability_for_booking
+from .businesses import check_business_availability_for_booking, service_allows_slot
 
 router = APIRouter(prefix="/bookings", tags=["bookings"])
 
@@ -30,6 +30,8 @@ def create_booking(payload: BookingCreateRequest, current_user: User = Depends(g
     available, end_at = check_business_availability_for_booking(payload.business_id, payload.start_at, service.duration_minutes, db)
     if not available:
         raise HTTPException(status_code=409, detail="Business is not available in that time slot")
+    if not service_allows_slot(service, business, payload.start_at, end_at):
+        raise HTTPException(status_code=409, detail="Service is not available in that time slot")
 
     booking = Booking(
         id=make_id("book"),
@@ -103,6 +105,8 @@ def reschedule_booking(booking_id: str, payload: BookingRescheduleRequest, curre
     available, end_at = check_business_availability_for_booking(booking.business_id, payload.start_at, service.duration_minutes, db, ignore_booking_id=booking.id)
     if not available:
         raise HTTPException(status_code=409, detail="Business is not available in that time slot")
+    if not service_allows_slot(service, business, payload.start_at, end_at):
+        raise HTTPException(status_code=409, detail="Service is not available in that time slot")
     booking.start_at = payload.start_at
     booking.end_at = end_at
     db.commit()

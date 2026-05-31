@@ -61,6 +61,7 @@ def service_payload(service: Service) -> dict:
         "duration_minutes": service.duration_minutes,
         "price": service.price,
         "active": service.active,
+        "weekly_hours": service.weekly_hours or {},
         "created_at": service.created_at,
         "updated_at": service.updated_at,
     }

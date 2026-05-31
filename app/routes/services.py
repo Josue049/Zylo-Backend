@@ -17,7 +17,7 @@ def update_service(service_id: str, payload: ServiceUpdateRequest, current_busin
     service = db.get(Service, service_id)
     if not service or service.business_id != current_business.id:
         raise HTTPException(status_code=404, detail="Service not found")
-    for field_name in ["name", "description", "duration_minutes", "price", "active"]:
+    for field_name in ["name", "description", "duration_minutes", "price", "active", "weekly_hours"]:
         value = getattr(payload, field_name)
         if value is not None:
             setattr(service, field_name, value)

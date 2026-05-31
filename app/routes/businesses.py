@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 from collections import defaultdict
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone, time
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..db import get_db
-from ..deps import get_current_business
-from ..models import AvailabilityBlock, Booking, Business, Service
-from ..schemas import AvailabilityBlockCreateRequest, ServiceCreateRequest
+from ..deps import get_current_business, get_current_user
+from ..models import AvailabilityBlock, Booking, Business, Review, Service, User
+from ..schemas import AvailabilityBlockCreateRequest, BusinessReviewRequest, ServiceCreateRequest
 from ..serializers import business_payload, service_payload
 from ..utils import make_id
 
@@ -76,6 +76,46 @@ def business_owned_by_current_user(current_business: Business) -> Business:
     return current_business
 
 
+WEEKDAY_KEYS = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+
+
+def weekday_key(value: datetime) -> str:
+    return WEEKDAY_KEYS[value.weekday()]
+
+
+def parse_clock(value: str) -> time:
+    return datetime.strptime(value, "%H:%M").time()
+
+
+def schedule_allows_slot(schedule: dict | None, start_at: datetime, end_at: datetime) -> bool:
+    if not schedule:
+        return True
+    if start_at.date() != end_at.date():
+        return False
+    windows = schedule.get(weekday_key(start_at), []) or []
+    if len(windows) < 2 or len(windows) % 2 != 0:
+        return False
+    start_time = start_at.time()
+    end_time = end_at.time()
+    for index in range(0, len(windows), 2):
+        window_start = parse_clock(windows[index])
+        window_end = parse_clock(windows[index + 1])
+        if window_start <= start_time and end_time <= window_end:
+            return True
+    return False
+
+
+def service_allows_slot(service: Service, business: Business, start_at: datetime, end_at: datetime) -> bool:
+    schedule = service.weekly_hours or business.weekly_hours or {}
+    return schedule_allows_slot(schedule, start_at, end_at)
+
+
+def recalculate_business_rating(db: Session, business: Business) -> None:
+    reviews = list(db.scalars(select(Review).where(Review.business_id == business.id)))
+    business.reviews_count = len(reviews)
+    business.rating = round(sum(review.rating for review in reviews) / len(reviews), 2) if reviews else 0.0
+
+
 @router.get("")
 def list_businesses(
     search: str | None = Query(default=None),
@@ -124,6 +164,7 @@ def create_my_service(payload: ServiceCreateRequest, current_business: Business 
         duration_minutes=payload.duration_minutes,
         price=payload.price,
         active=payload.active,
+        weekly_hours=payload.weekly_hours or {},
     )
     db.add(service)
     db.commit()
@@ -246,6 +287,73 @@ def business_detail(business_id: str, db: Session = Depends(get_db)):
     if not business:
         raise HTTPException(status_code=404, detail="Business not found")
     return {"business": serialize_business(db, business)}
+
+
+@router.get("/{business_id}/reviews")
+def business_reviews(business_id: str, db: Session = Depends(get_db)):
+    business = db.get(Business, business_id)
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+    reviews = list(db.scalars(select(Review).where(Review.business_id == business_id).order_by(Review.created_at.desc())))
+    return {
+        "items": [
+            {
+                "id": review.id,
+                "user_id": review.user_id,
+                "business_id": review.business_id,
+                "rating": review.rating,
+                "comment": review.comment,
+                "created_at": review.created_at,
+                "updated_at": review.updated_at,
+            }
+            for review in reviews
+        ]
+    }
+
+
+@router.post("/{business_id}/reviews")
+def rate_business(business_id: str, payload: BusinessReviewRequest, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    if current_user.role != "client":
+        raise HTTPException(status_code=403, detail="Only client users can rate businesses")
+
+    business = db.get(Business, business_id)
+    if not business:
+        raise HTTPException(status_code=404, detail="Business not found")
+
+    comment = payload.comment.strip() if payload.comment is not None else None
+    if comment == "":
+        comment = None
+
+    review = db.scalar(select(Review).where(Review.business_id == business_id, Review.user_id == current_user.id))
+    if review is None:
+        review = Review(
+            id=make_id("rev"),
+            user_id=current_user.id,
+            business_id=business_id,
+            rating=payload.rating,
+            comment=comment,
+        )
+        db.add(review)
+    else:
+        review.rating = payload.rating
+        review.comment = comment
+
+    db.commit()
+    recalculate_business_rating(db, business)
+    db.commit()
+    db.refresh(business)
+    return {
+        "review": {
+            "id": review.id,
+            "user_id": review.user_id,
+            "business_id": review.business_id,
+            "rating": review.rating,
+            "comment": review.comment,
+            "created_at": review.created_at,
+            "updated_at": review.updated_at,
+        },
+        "business": serialize_business(db, business),
+    }
 
 
 @router.post("/{business_id}/availability-blocks")
